@@ -60,7 +60,8 @@ export async function getUserData(id: string): Promise<User | null> {
    }
   }
 
-  activities = otherActivities.map((activity) => {
+  activities = otherActivities.map((cachedActivity) => {
+   const activity = { ...cachedActivity, assets: cachedActivity.assets ? { ...cachedActivity.assets } : undefined };
    delete activity.party;
    delete activity.instance;
    delete activity.secrets;

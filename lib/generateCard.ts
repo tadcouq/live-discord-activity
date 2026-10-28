@@ -42,163 +42,87 @@ async function generateBadgeImages(badges: string[]) {
   .join("");
 }
 
-async function generateActivityDetails(activity: UserActivity | null) {
- if (!activity) return "";
+function text(value: string, limit = 48) {
+ return escape(shortenText(value, limit));
+}
 
- const activityImage = activity.assets?.large_image
-  ? `<img
-         style="border-radius: 10px;"
-         src="${await base64ImageFetcher(activity.assets.large_image)}"
-         alt="${escape(activity.assets.large_text || "Activity Image")}"
-         width="82px"
-         height="82px"
-       />`
-  : "";
+export function selectActivities(activities: UserActivity[], options: cardOptionsSchema) {
+ return activities.filter((activity) =>
+  activity.type !== ActivityTypes.Custom &&
+  !(options.hideSpotify && activity.name === "Spotify") &&
+  !options.ignoreAppId.includes(String(activity.application_id ?? ""))
+ ).slice(0, options.maxActivities);
+}
 
- let activityType = "Unknown";
+function activityTime(activity: UserActivity) {
+ const start = Number(activity.timestamps?.start);
+ if (!Number.isFinite(start) || start <= 0) return "";
+ const seconds = Math.max(0, Math.floor((Date.now() - start) / 1000));
+ const minutes = Math.floor(seconds / 60);
+ return `${minutes}:${String(seconds % 60).padStart(2, "0")} elapsed`;
+}
 
- if (activity.type === ActivityTypes.Playing) {
-  activityType = "Playing ";
- } else if (activity.type === ActivityTypes.Streaming) {
-  activityType = "Streaming ";
- } else if (activity.type === ActivityTypes.Listening) {
-  activityType = "Listening to Spotify...";
- } else if (activity.type === ActivityTypes.Watching) {
-  activityType = "Watching ";
- } else if (activity.type === ActivityTypes.Competing) {
-  activityType = "Competing in ";
- }
-
- return `
-    <div style="display: flex; flex-direction: column; margin-top: 12px; font-weight: 700; color: #fff;">
-      <div style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start;">
-        <div style="display: flex; position: relative; flex-direction: column; margin-right: 4px;">
-          ${activityImage}
-        </div>
-        <div style="display: flex; flex-direction: column; align-items: flex-start; justify-content: center; margin-left: 8px;">
-          <span style="font-size: 1.15rem; font-weight: 700; color: ${activity.type === ActivityTypes.Listening ? "#1CB853" : "#fff"};">${activityType}${shortenText(escape(activity.name || ""), 32)}</span>
-          ${activity.details ? `<span style="font-weight: 400; color: #fff; opacity: 0.5;">${shortenText(escape(activity.details), 80)}</span>` : ""}
-          ${activity.state ? `<span style="font-weight: 400; color: #fff; opacity: 0.5;">${activity.type === ActivityTypes.Listening ? "By " : ""}${shortenText(escape(activity.state), 32)}</span>` : ""}
-        </div>
-      </div>
-    </div>
-  `;
+async function generateActivityDetails(activity: UserActivity, options: cardOptionsSchema, foreground: string) {
+ const image = activity.assets?.large_image ? await base64ImageFetcher(activity.assets.large_image) : "";
+ const labels: Record<number, string> = {
+  [ActivityTypes.Playing]: "Playing",
+  [ActivityTypes.Streaming]: "Streaming",
+  [ActivityTypes.Listening]: "Listening to",
+  [ActivityTypes.Watching]: "Watching",
+  [ActivityTypes.Competing]: "Competing in",
+ };
+ const elapsed = options.hideTimestamp ? "" : activityTime(activity);
+ return `<div style="display:flex;align-items:center;gap:12px;height:100px;color:${foreground};">
+  ${image ? `<img src="${image}" alt="${text(activity.assets?.large_text || "Activity image")}" width="72" height="72" style="border-radius:8px;object-fit:cover;" />` : ""}
+  <div style="min-width:0;flex:1;line-height:1.4;overflow:hidden;">
+   <div style="font-size:11px;opacity:0.65;">${labels[activity.type] || "Activity"}</div>
+   <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${activity.name === "Spotify" ? "color:#16883e;" : ""}">${text(activity.name || "Unknown")}</div>
+   ${activity.details ? `<div style="font-size:13px;opacity:0.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${text(activity.details, 80)}</div>` : ""}
+   ${activity.state ? `<div style="font-size:13px;opacity:0.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${text(activity.state, 80)}</div>` : ""}
+   ${elapsed ? `<div style="font-size:11px;opacity:0.65;">${elapsed}</div>` : ""}
+  </div>
+ </div>`;
 }
 
 export async function generateCard(user: User, options: cardOptionsSchema): Promise<string> {
  try {
-  const userAvatar = await base64ImageFetcher(user.avatar);
-
-  const firstActivity = user.activities[0] || null;
-  const userName = shortenText(escape(user.username || "Unknown"), 32);
-  const userStatus = availableStatuses[user.status.desktop || user.status.mobile || user.status.web || "offline"];
-
-  return `
-      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xhtml="http://www.w3.org/1999/xhtml" width="400px" height="200px">
-        <foreignObject x="0" y="0" width="410px" height="200px">
-          <div
-            xmlns="http://www.w3.org/1999/xhtml"
-            style="
-              position: absolute;
-              font-size: 16px;
-              width: 400px;
-              height: 200px;
-              inset: 0px;
-              font-family: 'Century Gothic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-              background-color: ${options.backgroundColor || "#000"};
-              border-radius: ${options.borderRadius || 10}px;
-            "
-          >
-            <div style="padding: 12px;">
-              <div style="display: flex; align-items: center; flex-direction: row;">
-                <div style="position: relative;">
-                  <img
-                    alt="${userName}'s Avatar"
-                    src="${userAvatar}"
-                    width="64px"
-                    height="64px"
-                    style="border-radius: 100%;"
-                  />
-                  ${
-   !options.hideStatus
-    ? `
-                    <div
-                      style="
-                        position: absolute;
-                        bottom: 0px;
-                        right: 0px;
-                        border-radius: 100%;
-                        background-color: ${options.backgroundColor || "#000"};
-                        padding: 4px;
-                      "
-                    >
-                      <div
-                        style="
-                          width: 12px;
-                          height: 12px;
-                          border-radius: 100%;
-                          background-color: ${userStatus};
-                        "
-                      />
-                    </div>`
-    : ""
+  const foreground = options.theme === "light" ? "#18202e" : "#ffffff";
+  const activities = selectActivities(user.activities, options);
+  const showActivity = options.hideActivity !== "true" && !(options.hideActivity === "whenNotUsed" && !activities.length);
+  const profileHeight = options.hideProfile ? 0 : 64;
+  const activityHeight = showActivity ? Math.max(1, activities.length) * 100 : 0;
+  const dividerHeight = !options.hideProfile && showActivity ? 12 : 0;
+  const height = Math.max(48, 24 + profileHeight + dividerHeight + activityHeight);
+  const userName = text(user.username || "Unknown", 32);
+  const userStatus = availableStatuses[user.status.desktop || user.status.mobile || user.status.web || "offline"] || availableStatuses.offline;
+  let profile = "";
+  if (!options.hideProfile) {
+   const avatarUrl = options.animated ? user.avatar : user.avatar.replace(/\.gif(?=\?|$)/, ".png");
+   const avatar = await base64ImageFetcher(avatarUrl);
+   const emoji = !options.hideCustomStatus && user.customStatus?.image ? await base64ImageFetcher(user.customStatus.image) : "";
+   profile = `<div style="display:flex;align-items:center;height:64px;gap:12px;">
+    <div style="position:relative;flex-shrink:0;width:64px;height:64px;">
+     <img alt="${userName}'s Avatar" src="${avatar}" width="64" height="64" style="border-radius:100%;" />
+     ${!options.hideStatus ? `<div style="position:absolute;bottom:0;right:0;border:4px solid ${options.backgroundColor};border-radius:100%;width:12px;height:12px;background:${userStatus};"></div>` : ""}
+    </div>
+    <div style="min-width:0;flex:1;">
+     <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${userName}</div>
+     ${!options.hideBadges && user.badges.length ? `<div style="display:flex;height:24px;overflow:hidden;">${await generateBadgeImages(user.badges)}</div>` : ""}
+     ${!options.hideCustomStatus && user.customStatus ? `<div style="font-size:13px;opacity:0.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emoji ? `<img src="${emoji}" alt="emoji" width="16" height="16" /> ` : ""}${text(user.customStatus.state || "", 64)}</div>` : ""}
+    </div>
+   </div>`;
   }
-                </div>
-                <div style="margin-left: 12px;">
-                  <span
-                    style="
-                      display: flex;
-                      align-items: center;
-                      font-size: 1.15rem;
-                      margin: 0 12px 0 0;
-                      white-space: nowrap;
-                      font-weight: 700;
-                      color: #fff;
-                    "
-                  >
-                    ${userName}
-                    ${!options.hideBadges ? await generateBadgeImages(user.badges) : ""}
-                  </span>
-                  ${
-   !options.hideCustomStatus && user.customStatus
-    ? `
-                    <div style="display: flex; width: 100%; flex-direction: row; align-items: center;">
-                      ${user.customStatus.image ? `<img src="${await base64ImageFetcher(user.customStatus.image)}" alt="emoji" width="16px" height="16px" />` : `<div style="display: flex"></div>`}
-                      <span
-                        style="
-                          opacity: 0.5;
-                          ${user.customStatus.image ? "margin-left: 4px;" : ""}
-                          color: #fff;
-                        "
-                      >
-                        ${shortenText(escape(user.customStatus.state || ""), 32)}
-                      </span>
-                    </div>`
-    : ""
-  }
-                </div>
-              </div>
-              <div style="width: 100%; background-color: #ffffff1a; height: 1px; margin-top: 12px;" />
-              ${
-   firstActivity ? await generateActivityDetails(firstActivity) : `
-                <span
-                  style="
-                    padding: 26px;
-                    color: #fff;
-                    opacity: 0.5;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                  "
-                >
-                  ${shortenText(escape(options.idleMessage || "No activity"), 80)}
-                </span>`
-  }
-            </div>
-          </div>
-        </foreignObject>
-      </svg>
-    `;
+  const activityContent = !showActivity ? "" : activities.length ? (await Promise.all(activities.map((activity) => generateActivityDetails(activity, options, foreground)))).join("") : `<div style="height:100px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:14px;opacity:0.65;overflow-wrap:anywhere;">${text(options.idleMessage, 100)}</div>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="${height}" viewBox="0 0 400 ${height}" role="img" aria-label="Discord activity card">
+   <title>Discord activity card</title>
+   <foreignObject x="0" y="0" width="400" height="${height}">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="box-sizing:border-box;width:400px;height:${height}px;padding:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;background:${options.backgroundColor};color:${foreground};border-radius:${options.borderRadius}px;overflow:hidden;">
+     ${profile}
+     ${dividerHeight ? `<div style="height:1px;margin-top:11px;background:${foreground};opacity:0.1;"></div>` : ""}
+     ${activityContent}
+    </div>
+   </foreignObject>
+  </svg>`;
  } catch (error) {
   apiLogger.error("Error generating card:", error);
   return generateErrorCard("Failed to generate card.");

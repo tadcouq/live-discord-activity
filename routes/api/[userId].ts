@@ -12,7 +12,7 @@ export const handler = define.handlers({
    const id = params.userId;
    const url = new URL(req.url);
    const queryOptions = url.searchParams;
-   const options = cardOptions.safeParse(queryOptions);
+   const options = cardOptions.safeParse(Object.fromEntries(queryOptions));
 
    if (!discordUserId.safeParse(id).success) return throwImageError(400, "Please provide a valid user ID!");
    if (!options.success) return throwImageError(400, "Please provide valid query parameters!");

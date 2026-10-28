@@ -72,6 +72,24 @@ Then, in your browser, **go to `https://activity.igorkowalczyk.dev/api/:userId` 
 
 #### 🚀 Example
 
+The existing Deno/Fresh deployment, commands, and environment variables are unchanged. No database or additional service is required. The following options currently work through the card URL; homepage controls have not been added yet.
+
+| Parameter                          | Values / purpose                                                             | Default          |
+| ---------------------------------- | ---------------------------------------------------------------------------- | ---------------- |
+| `theme`                            | `dark` or `light`                                                            | `dark`           |
+| `backgroundColor`, `bgColor`, `bg` | Hex background; precedence follows this order, overriding the theme          | Theme background |
+| `hideProfile`                      | Hide avatar, name, badges and custom status                                  | `false`          |
+| `hideActivity`                     | `true`, `false`, or `whenNotUsed` (hide when no activity survives filtering) | `false`          |
+| `hideSpotify`                      | Hide Spotify activities                                                      | `false`          |
+| `ignoreAppId`                      | Comma-separated Discord application IDs to hide                              | Empty            |
+| `maxActivities`                    | Number of activities, from `1` to `5`                                        | `1`              |
+| `hideTimestamp`                    | Hide activity elapsed time                                                   | `false`          |
+| `animated`                         | Use animated avatars when available; `false` requests PNG                    | `true`           |
+
+`borderRadius` accepts an integer with an optional `px` suffix and is capped at 100px. Boolean options accept `true` or `false`. Invalid options return HTTP 400. Card height adjusts to the visible sections. Elapsed time is a snapshot at request time, not a live timer.
+
+Example: `/api/YOUR_DISCORD_ID?theme=light&maxActivities=3&hideSpotify=true`
+
 **URL**
 
 ```http
