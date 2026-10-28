@@ -174,5 +174,13 @@ Performance improvements require no extra service or environment variable:
 Run the isolated regression tests without a Discord token:
 
 ```sh
-deno test --allow-env --allow-read lib/card_test.ts lib/cardBuilder_test.ts lib/performance_test.ts
+deno test --allow-env --allow-read lib/card_test.ts lib/cardBuilder_test.ts lib/performance_test.ts lib/offlineUser_test.ts
 ```
+
+## Offline members
+
+Membership is verified with Discord's Get Guild Member endpoint for the configured `GUILD_ID`; a missing presence is no longer treated as a missing member. Offline members receive a normal profile card and idle message, and the JSON endpoint returns empty activities with an offline status when no presence is available. During gateway startup, an online member may briefly use this fallback until their presence arrives.
+
+Verified member profiles are cached for up to 30 seconds. Member add/update/remove events invalidate that entry; removal also clears presence. Only Discord's `Unknown Member` response becomes a not-found result. Permission, guild configuration and network failures remain server errors rather than misleading not-found responses. Presence updates from other guilds are ignored.
+
+This uses the existing bot token, guild ID and Guild Members / Guild Presences intents; deployment settings are unchanged. The voice-activity filter is deferred.

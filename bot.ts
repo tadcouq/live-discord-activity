@@ -3,12 +3,15 @@ import { createBot, DiscordGatewayPayload, DiscordGuildMembersChunk } from "@dis
 import { DiscordPresenceUpdate, Intents } from "npm:@discordeno/types@20.0.0";
 import { addDesiredProperties } from "./lib/addDesiredProperties.ts";
 
+import { memberProfiles } from "./lib/memberProfiles.ts";
+
 export const presencesCache = new Map<string, DiscordPresenceUpdate>();
 
 export const bot = createBot({
  token: Deno.env.get("TOKEN") || "",
  intents: Intents.Guilds | Intents.GuildMembers | Intents.GuildPresences,
  desiredProperties: {
+  member: { user: true },
   user: {
    id: true,
    username: true,
@@ -31,6 +34,7 @@ export const bot = createBot({
   raw: (data: DiscordGatewayPayload) => {
    if (data.t === "GUILD_MEMBERS_CHUNK") {
     const guildChunk = data.d as DiscordGuildMembersChunk;
+    if (guildChunk.guild_id.toString() !== Deno.env.get("GUILD_ID")) return;
     if (!guildChunk.presences) return;
     guildChunk.presences.forEach((presence: DiscordPresenceUpdate) => {
      presencesCache.set(presence.user.id.toString(), presence);
@@ -38,7 +42,15 @@ export const bot = createBot({
    }
    if (data.t === "PRESENCE_UPDATE") {
     const presence = data.d as DiscordPresenceUpdate;
+    if (presence.guild_id.toString() !== Deno.env.get("GUILD_ID")) return;
     presencesCache.set(presence.user.id.toString(), presence);
+   }
+   if (data.t === "GUILD_MEMBER_REMOVE" || data.t === "GUILD_MEMBER_UPDATE" || data.t === "GUILD_MEMBER_ADD") {
+    const member = data.d as { guild_id: string; user: { id: string } };
+    if (member.guild_id.toString() !== Deno.env.get("GUILD_ID")) return;
+    const id = member.user.id.toString();
+    memberProfiles.delete(`${member.guild_id}:${id}`);
+    if (data.t === "GUILD_MEMBER_REMOVE") presencesCache.delete(id);
    }
   },
   ready: ({ user }) => {

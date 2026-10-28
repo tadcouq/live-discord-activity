@@ -1,108 +1,17 @@
-import { type User, UserActivity } from "./schemas.ts";
-import { presencesCache } from "../bot.ts";
-import { calculateBadges } from "./calculateBadges.ts";
-import { bot } from "../bot.ts";
-import { ActivityTypes } from "npm:@discordeno/types@20.0.0";
-import { getIconCode } from "./utils.ts";
+import { bot, presencesCache } from "../bot.ts";
+import { buildUserData } from "./buildUserData.ts";
+import { findMemberProfile, memberProfiles } from "./memberProfiles.ts";
 import "./patchBigInt.ts";
-import { createAsyncCache } from "./asyncCache.ts";
 
-// Cache profile metadata only. Presence/activity always comes from the gateway cache.
-const profiles = createAsyncCache<Awaited<ReturnType<typeof bot.helpers.getUser>>>({ ttl: 30_000, maxEntries: 512, cacheable: Boolean });
-
-export const spotifyImageToUrl = (url: string) => {
- if (url.startsWith("spotify:")) {
-  const [_, id] = url.split(":");
-  return `https://i.scdn.co/image/${id}`;
- }
- return url;
-};
-
-export const externalMediaToUrl = (url: string) => {
- if (url.startsWith("mp:external/")) {
-  return `https://media.discordapp.net/${url.replace("mp:", "")}`;
- }
- return url;
-};
-
-export async function getUserData(id: string): Promise<User | null> {
- const userData = await profiles(id, () => bot.helpers.getUser(id));
- if (!userData) return null;
- if (userData.bot) return null;
-
- const userPresences = presencesCache.get(id);
- if (!userPresences) return null;
-
- let avatar;
- let avatarType;
- let statusEmoji = null;
- let statusState = null;
- let activities: UserActivity[] = [];
-
- if (userData.avatar) {
-  const hex = userData.avatar.toString(16);
-  avatarType = hex.startsWith("a") ? "gif" : "png";
-  const avatarHash = hex.startsWith("a") ? `a_${hex.slice(1)}` : hex.slice(1);
-  avatar = userData.avatar ? `https://cdn.discordapp.com/avatars/${userData.id}/${avatarHash}.${avatarType}` : `https://cdn.discordapp.com/embed/avatars/${+userData.discriminator % 5}.png`;
- } else {
-  avatarType = "png";
-  avatar = `https://cdn.discordapp.com/embed/avatars/${+userData.discriminator % 5}.png`;
- }
-
- if (userPresences && userPresences.activities) {
-  const statusActivity = userPresences.activities.find((activity) => activity.type === ActivityTypes.Custom);
-  const otherActivities = userPresences.activities.filter((activity) => activity.type !== ActivityTypes.Custom);
-
-  if (statusActivity) {
-   if (statusActivity.state) statusState = statusActivity.state;
-   if (statusActivity.emoji) {
-    if (statusActivity.emoji.id) {
-     statusEmoji = `https://cdn.discordapp.com/emojis/${statusActivity.emoji.id}.${statusActivity.emoji.animated ? "gif" : "png"}`;
-    } else if (statusActivity.emoji.name) {
-     statusEmoji = `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/${getIconCode(statusActivity.emoji.name)}.png`;
-    }
-   }
-  }
-
-  activities = otherActivities.map((cachedActivity) => {
-   const activity = { ...cachedActivity, assets: cachedActivity.assets ? { ...cachedActivity.assets } : undefined };
-   delete activity.party;
-   delete activity.instance;
-   delete activity.secrets;
-   if (activity.assets) {
-    (["large_image", "small_image"] as ("large_image" | "small_image")[]).forEach((key) => {
-     if (activity.assets && typeof activity.assets[key] === "string" && activity.assets[key].startsWith("spotify:")) {
-      activity.assets[key] = spotifyImageToUrl(activity.assets[key]);
-     } else if (activity.assets && typeof activity.assets[key] === "string" && activity.assets[key].startsWith("mp:external/")) {
-      activity.assets[key] = externalMediaToUrl(activity.assets[key]);
-     } else if (activity.assets && typeof activity.assets[key] === "string") {
-      activity.assets[key] = `https://cdn.discordapp.com/app-assets/${activity.application_id}/${activity.assets[key]}.png`;
-     } else if (activity.assets) {
-      activity.assets[key] = undefined;
-     }
-    });
-   }
-   return activity;
-  });
- }
-
- return {
-  bot: userData.bot,
-  activities: activities,
-  customStatus: {
-   image: statusEmoji,
-   state: statusState,
-  },
-  status: {
-   desktop: userPresences.client_status.desktop,
-   mobile: userPresences.client_status.mobile,
-   web: userPresences.client_status.web,
-  },
-  id: BigInt(userData.id),
-  username: userData.globalName || userData.username || "Unknown",
-  discriminator: userData.discriminator,
-  avatar: avatar,
-  publicFlags: userData.publicFlags,
-  badges: calculateBadges(userData.publicFlags, avatarType),
- };
+export async function getUserData(id: string) {
+ const guildId = Deno.env.get("GUILD_ID");
+ if (!guildId) throw new Error("GUILD_ID is required to verify server membership");
+ const profile = await memberProfiles(`${guildId}:${id}`, () =>
+  findMemberProfile(async () => {
+   const member = await bot.helpers.getMember(guildId, id);
+   return member.user;
+  }));
+ if (!profile) return null;
+ // Offline members may have no presence at all; membership was verified above.
+ return buildUserData(profile, presencesCache.get(id));
 }

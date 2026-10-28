@@ -14,7 +14,7 @@ export function createAsyncCache<T>({ ttl, maxEntries, maxWeight = Infinity, wei
   totalWeight -= entries.get(key)?.weight ?? 0;
   entries.delete(key);
  };
- return (key: string, loader: () => Promise<T>): Promise<T> => {
+ const get = (key: string, loader: () => Promise<T>): Promise<T> => {
   const cached = entries.get(key);
   if (cached && cached.expires > now()) {
    entries.delete(key);
@@ -26,7 +26,7 @@ export function createAsyncCache<T>({ ttl, maxEntries, maxWeight = Infinity, wei
   if (loading) return loading;
   const promise = Promise.resolve().then(loader).then((value) => {
    const size = weight(value);
-   if (cacheable(value) && size <= maxWeight) {
+   if (pending.get(key) === promise && cacheable(value) && size <= maxWeight) {
     for (const [entryKey, entry] of entries) if (entry.expires <= now()) remove(entryKey);
     remove(key);
     while (entries.size && (entries.size >= maxEntries || totalWeight + size > maxWeight)) remove(entries.keys().next().value!);
@@ -40,4 +40,10 @@ export function createAsyncCache<T>({ ttl, maxEntries, maxWeight = Infinity, wei
   if (pending.size < maxEntries) pending.set(key, promise);
   return promise;
  };
+ return Object.assign(get, {
+  delete: (key: string) => {
+   remove(key);
+   pending.delete(key);
+  },
+ });
 }
