@@ -1,13 +1,47 @@
-export const base64ImageFetcher = async (url: string) => {
- try {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Invalid URL - Failed to fetch image");
-  const blob = await res.blob();
-  if (!blob.type.startsWith("image")) throw new Error("Failed to process blob");
-  const buffer = await blob.arrayBuffer();
-  const binary = new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), "");
-  return `data:${blob.type};base64,${btoa(binary)}`;
- } catch {
-  return "";
- }
-};
+import { createAsyncCache } from "./asyncCache.ts";
+
+const images = createAsyncCache<string>({
+ ttl: 5 * 60_000,
+ maxEntries: 128,
+ maxWeight: 16 * 1024 * 1024,
+ weight: (value) => value.length * 2,
+ cacheable: Boolean,
+});
+const maxImageBytes = 2 * 1024 * 1024;
+
+export const base64ImageFetcher = (url: string): Promise<string> =>
+ images(url, async () => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+   const res = await fetch(url, { signal: controller.signal });
+   const mime = res.headers.get("content-type")?.split(";")[0].trim();
+   if (!res.ok || !mime || !/^image\/(png|jpeg|jpg|gif|webp|avif|x-icon)$/i.test(mime) || Number(res.headers.get("content-length")) > maxImageBytes) {
+    await res.body?.cancel();
+    return "";
+   }
+   if (!res.body) return "";
+   const reader = res.body.getReader();
+   const chunks: Uint8Array[] = [];
+   let size = 0;
+   while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > maxImageBytes) {
+     await reader.cancel();
+     return "";
+    }
+    chunks.push(value);
+   }
+   let binary = "";
+   for (const chunk of chunks) {
+    for (let i = 0; i < chunk.length; i += 8192) binary += String.fromCharCode(...chunk.subarray(i, i + 8192));
+   }
+   return size ? `data:${mime};base64,${btoa(binary)}` : "";
+  } catch {
+   return "";
+  } finally {
+   clearTimeout(timer);
+  }
+ });

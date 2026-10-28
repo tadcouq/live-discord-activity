@@ -33,7 +33,7 @@ export default define.page((props: PageProps) => {
     </div>
    </section>
    <section className="border-x border-b border-neutral-800" id="preview">
-    <Preview defaultUrl={props.url.toString()} />
+    <Preview defaultUrl={props.url.origin} />
    </section>
   </>
  );

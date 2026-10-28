@@ -5,6 +5,10 @@ import { bot } from "../bot.ts";
 import { ActivityTypes } from "npm:@discordeno/types@20.0.0";
 import { getIconCode } from "./utils.ts";
 import "./patchBigInt.ts";
+import { createAsyncCache } from "./asyncCache.ts";
+
+// Cache profile metadata only. Presence/activity always comes from the gateway cache.
+const profiles = createAsyncCache<Awaited<ReturnType<typeof bot.helpers.getUser>>>({ ttl: 30_000, maxEntries: 512, cacheable: Boolean });
 
 export const spotifyImageToUrl = (url: string) => {
  if (url.startsWith("spotify:")) {
@@ -22,7 +26,7 @@ export const externalMediaToUrl = (url: string) => {
 };
 
 export async function getUserData(id: string): Promise<User | null> {
- const userData = await bot.helpers.getUser(id);
+ const userData = await profiles(id, () => bot.helpers.getUser(id));
  if (!userData) return null;
  if (userData.bot) return null;
 

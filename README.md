@@ -72,7 +72,7 @@ Then, in your browser, **go to `https://activity.igorkowalczyk.dev/api/:userId` 
 
 #### 🚀 Example
 
-The existing Deno/Fresh deployment, commands, and environment variables are unchanged. No database or additional service is required. The following options currently work through the card URL; homepage controls have not been added yet.
+The existing Deno/Fresh deployment, commands, and environment variables are unchanged. No database or additional service is required. The homepage editor exposes all the options below, updates the preview automatically, and exports Markdown, HTML (an image embed pointing to SVG), or a direct SVG URL. The raw JSON API remains available.
 
 | Parameter                          | Values / purpose                                                             | Default          |
 | ---------------------------------- | ---------------------------------------------------------------------------- | ---------------- |
@@ -158,3 +158,21 @@ When submitting a pull request, please follow these steps:
 ## 📋 License
 
 This project is licensed under the MIT. See the [LICENSE](https://github.com/igorkowalczyk/discord-activity/blob/main/license.md) file for details
+
+## Editor and performance
+
+Enter your Discord ID on the homepage, adjust the appearance and visibility controls, then select **Markdown**, **HTML (SVG)**, or **URL** and copy the generated code. HTML exports an `<img>` pointing to the SVG endpoint, not a frozen inline SVG. Preview requests are debounced by 300ms; generated code updates immediately. Invalid input is reported before sending a preview request, and copy failures leave selectable code for manual copying.
+
+Performance improvements require no extra service or environment variable:
+
+- Independent avatar, emoji, badge and activity images load concurrently.
+- Image requests share in-flight work and reuse a process-local cache for 5 minutes, capped at 128 entries / approximately 16 MiB of string data. Each image has a 4-second download timeout and a 2 MiB limit; unavailable or oversized images are omitted without blocking the card indefinitely. Failed downloads are retried on subsequent requests.
+- Local badge images are cached for one hour (up to 64 entries).
+- Discord profile metadata is cached for 30 seconds (up to 512 users), while activity and status still read the gateway presence cache for every render. Avatar/name changes can take up to 30 seconds to appear; bytes served at an unchanged image URL can remain cached for 5 minutes.
+- Rendered cards are not cached by this implementation, so changing theme/filters does not reuse another card configuration or freeze activity timestamps. Caches are per process and reset on restart; cold starts still depend on Discord/CDN response times.
+
+Run the isolated regression tests without a Discord token:
+
+```sh
+deno test --allow-env --allow-read lib/card_test.ts lib/cardBuilder_test.ts lib/performance_test.ts
+```

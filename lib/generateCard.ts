@@ -5,6 +5,10 @@ import { base64ImageFetcher } from "./base64ImageFetcher.ts";
 import { ActivityTypes } from "npm:@discordeno/types@20.0.0";
 import { apiLogger } from "../lib/logger.ts";
 
+import { createAsyncCache } from "./asyncCache.ts";
+
+const badgeImages = createAsyncCache<string>({ ttl: 60 * 60_000, maxEntries: 64, cacheable: Boolean });
+
 const availableStatuses: Record<string, string> = {
  online: "#43B581",
  idle: "#FAA61A",
@@ -15,17 +19,18 @@ const availableStatuses: Record<string, string> = {
 async function generateBadgeImages(badges: string[]) {
  const userBadges = new Map<string, string>();
 
- for (const badge of badges) {
-  try {
-   const filePath = `./static/badges/${badge.toLowerCase()}.png`;
-   const fileData = await Deno.readFile(filePath);
-   const base64Image = `data:image/png;base64,${btoa(String.fromCharCode(...fileData))}`;
-   userBadges.set(badge, base64Image);
-  } catch {
-   apiLogger.error(`Failed to load badge image: ${badge}`);
-   userBadges.set(badge, "");
-  }
- }
+ await Promise.all(badges.map(async (badge) => {
+  const image = await badgeImages(badge, async () => {
+   try {
+    const fileData = await Deno.readFile(`./static/badges/${badge.toLowerCase()}.png`);
+    return `data:image/png;base64,${btoa(String.fromCharCode(...fileData))}`;
+   } catch {
+    apiLogger.error(`Failed to load badge image: ${badge}`);
+    return "";
+   }
+  });
+  userBadges.set(badge, image);
+ }));
 
  return badges
   .map(
@@ -95,11 +100,16 @@ export async function generateCard(user: User, options: cardOptionsSchema): Prom
   const height = Math.max(48, 24 + profileHeight + dividerHeight + activityHeight);
   const userName = text(user.username || "Unknown", 32);
   const userStatus = availableStatuses[user.status.desktop || user.status.mobile || user.status.web || "offline"] || availableStatuses.offline;
+  // Start all independent image work together; only visible sections fetch assets.
+  const activityContentPromise = !showActivity ? Promise.resolve("") : activities.length ? Promise.all(activities.map((activity) => generateActivityDetails(activity, options, foreground))).then((parts) => parts.join("")) : Promise.resolve(`<div style="height:100px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:14px;opacity:0.65;overflow-wrap:anywhere;">${text(options.idleMessage, 100)}</div>`);
   let profile = "";
   if (!options.hideProfile) {
    const avatarUrl = options.animated ? user.avatar : user.avatar.replace(/\.gif(?=\?|$)/, ".png");
-   const avatar = await base64ImageFetcher(avatarUrl);
-   const emoji = !options.hideCustomStatus && user.customStatus?.image ? await base64ImageFetcher(user.customStatus.image) : "";
+   const [avatar, emoji, badges] = await Promise.all([
+    base64ImageFetcher(avatarUrl),
+    !options.hideCustomStatus && user.customStatus?.image ? base64ImageFetcher(user.customStatus.image) : Promise.resolve(""),
+    !options.hideBadges && user.badges.length ? generateBadgeImages(user.badges) : Promise.resolve(""),
+   ]);
    profile = `<div style="display:flex;align-items:center;height:64px;gap:12px;">
     <div style="position:relative;flex-shrink:0;width:64px;height:64px;">
      <img alt="${userName}'s Avatar" src="${avatar}" width="64" height="64" style="border-radius:100%;" />
@@ -107,12 +117,12 @@ export async function generateCard(user: User, options: cardOptionsSchema): Prom
     </div>
     <div style="min-width:0;flex:1;">
      <div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${userName}</div>
-     ${!options.hideBadges && user.badges.length ? `<div style="display:flex;height:24px;overflow:hidden;">${await generateBadgeImages(user.badges)}</div>` : ""}
+     ${!options.hideBadges && user.badges.length ? `<div style="display:flex;height:24px;overflow:hidden;">${badges}</div>` : ""}
      ${!options.hideCustomStatus && user.customStatus ? `<div style="font-size:13px;opacity:0.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emoji ? `<img src="${emoji}" alt="emoji" width="16" height="16" /> ` : ""}${text(user.customStatus.state || "", 64)}</div>` : ""}
     </div>
    </div>`;
   }
-  const activityContent = !showActivity ? "" : activities.length ? (await Promise.all(activities.map((activity) => generateActivityDetails(activity, options, foreground)))).join("") : `<div style="height:100px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:14px;opacity:0.65;overflow-wrap:anywhere;">${text(options.idleMessage, 100)}</div>`;
+  const activityContent = await activityContentPromise;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="${height}" viewBox="0 0 400 ${height}" role="img" aria-label="Discord activity card">
    <title>Discord activity card</title>
    <foreignObject x="0" y="0" width="400" height="${height}">
