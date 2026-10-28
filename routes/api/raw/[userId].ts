@@ -11,7 +11,7 @@ export const handler = define.handlers({
    const id = params.userId;
    if (!discordUserId.safeParse(id).success) return throwJsonError(400, "Please provide a valid user ID!");
 
-   await fetchUserPresences(id);
+   fetchUserPresences(id);
    const user = await getUserData(id);
    if (!user) return throwJsonError(404, `User not found! Did you join the server? ${Deno.env.get("INVITE_LINK")}`);
 

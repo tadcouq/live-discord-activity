@@ -16,7 +16,8 @@ export function throwImageError(code?: StatusCode, error?: string) {
  return new Response(card, {
   status: code || 500,
   headers: {
-   "Content-Type": "image/svg+xml",
+   "Content-Type": "image/svg+xml; charset=utf-8",
+   "Cache-Control": "no-store",
   },
  });
 }

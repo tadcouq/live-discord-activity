@@ -7,14 +7,24 @@ const images = createAsyncCache<string>({
  weight: (value) => value.length * 2,
  cacheable: Boolean,
 });
-const maxImageBytes = 2 * 1024 * 1024;
+const maxImageBytes = 256 * 1024;
+
+function sizedImageUrl(url: string) {
+ try {
+  const parsed = new URL(url);
+  if (parsed.hostname === "cdn.discordapp.com" || parsed.hostname === "media.discordapp.net") parsed.searchParams.set("size", "128");
+  return parsed.toString();
+ } catch {
+  return url;
+ }
+}
 
 export const base64ImageFetcher = (url: string): Promise<string> =>
- images(url, async () => {
+ images(sizedImageUrl(url), async () => {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 4000);
+  const timer = setTimeout(() => controller.abort(), 1500);
   try {
-   const res = await fetch(url, { signal: controller.signal });
+   const res = await fetch(sizedImageUrl(url), { signal: controller.signal });
    const mime = res.headers.get("content-type")?.split(";")[0].trim();
    if (!res.ok || !mime || !/^image\/(png|jpeg|jpg|gif|webp|avif|x-icon)$/i.test(mime) || Number(res.headers.get("content-length")) > maxImageBytes) {
     await res.body?.cancel();

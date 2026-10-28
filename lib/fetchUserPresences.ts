@@ -1,29 +1,16 @@
-import { DiscordUser, GatewayOpcodes } from "npm:@discordeno/types@20.0.0";
-import { bot } from "../bot.ts";
+import { GatewayOpcodes } from "npm:@discordeno/types@20.0.0";
+import { bot, presencesCache } from "../bot.ts";
+import { createPresenceRefresh } from "./presenceRefresh.ts";
 
-export async function fetchUserPresences(userId: DiscordUser["id"]) {
- try {
+export const fetchUserPresences = createPresenceRefresh(
+ async (userId) => {
   const guildId = Deno.env.get("GUILD_ID");
   if (!guildId) return;
-  const shardId = bot.gateway.calculateShardId(guildId);
-
-  const options = {
-   userIds: [userId.toString()],
-   limit: 1,
-   presences: true,
-  };
-
-  await bot.gateway.sendPayload(shardId, {
+  await bot.gateway.sendPayload(bot.gateway.calculateShardId(guildId), {
    op: GatewayOpcodes.RequestGuildMembers,
-   d: {
-    guild_id: guildId.toString(),
-    presences: options.presences ?? false,
-    user_ids: options.userIds.map((id) => id.toString()),
-   },
+   d: { guild_id: guildId, presences: true, user_ids: [userId] },
   });
-
-  return;
- } catch (error) {
-  bot.logger.error(error);
- }
-}
+ },
+ (id) => presencesCache.has(id),
+ (error) => bot.logger.error(error),
+);

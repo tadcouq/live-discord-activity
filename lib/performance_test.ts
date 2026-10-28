@@ -89,3 +89,36 @@ Deno.test("card loads independent assets concurrently and warm render makes no i
   globalThis.fetch = originalFetch;
  }
 });
+
+Deno.test("Discord image URLs request thumbnail sizes and reject oversized images", async () => {
+ const originalFetch = globalThis.fetch;
+ let requested = "";
+ globalThis.fetch = (input) => {
+  requested = String(input);
+  return Promise.resolve(new Response(new Uint8Array(256 * 1024 + 1), { headers: { "Content-Type": "image/png" } }));
+ };
+ try {
+  assert(await base64ImageFetcher("https://cdn.discordapp.com/avatars/123/hash.png?size=4096") === "", "Image byte limit ignored");
+  assert(new URL(requested).searchParams.get("size") === "128", "Full-size CDN image requested");
+ } finally {
+  globalThis.fetch = originalFetch;
+ }
+});
+
+Deno.test("slow image downloads abort instead of blocking the SVG indefinitely", async () => {
+ const originalFetch = globalThis.fetch;
+ let aborted = false;
+ globalThis.fetch = (_input, init) =>
+  new Promise<Response>((_resolve, reject) => {
+   init?.signal?.addEventListener("abort", () => {
+    aborted = true;
+    reject(new DOMException("Timed out", "AbortError"));
+   }, { once: true });
+  });
+ try {
+  const result = await base64ImageFetcher("https://images.test/slow.png");
+  assert(result === "" && aborted, "Slow image was not aborted gracefully");
+ } finally {
+  globalThis.fetch = originalFetch;
+ }
+});

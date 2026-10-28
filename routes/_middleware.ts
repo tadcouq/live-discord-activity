@@ -13,13 +13,11 @@ export default define.middleware(async (ctx) => {
  const time = performance.now();
  const resp = await ctx.next();
  resp.headers.set("Access-Control-Allow-Origin", "*");
- resp.headers.set("Access-Control-Allow-Methods", "GET");
+ resp.headers.set("Access-Control-Allow-Methods", "GET, HEAD");
  resp.headers.set("X-Content-Type-Options", "nosniff");
  resp.headers.set("X-XSS-Protection", "1; mode=block");
  resp.headers.set("Referrer-Policy", "no-referrer");
- resp.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
- resp.headers.set("Pragma", "no-cache");
- resp.headers.set("Expires", "0");
+ if (!resp.headers.has("Cache-Control")) resp.headers.set("Cache-Control", "no-cache");
 
  apiLogger.info(`${ctx.req.method} ${ctx.req.url} - ${(performance.now() - time).toFixed(2)}ms`);
  return resp;

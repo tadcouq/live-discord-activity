@@ -59,6 +59,8 @@ export const bot = createBot({
  },
 });
 
-await bot.start();
-
 addDesiredProperties(bot);
+
+// REST member lookup can run before the gateway is ready. Do not block HTTP
+// route loading (and GitHub's image proxy) on a websocket handshake/cold start.
+void bot.start().catch((error) => bot.logger.error("Discord gateway startup failed", error));
