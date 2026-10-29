@@ -1,5 +1,6 @@
-import { bot, presencesCache } from "../bot.ts";
+import { bot, presenceWait } from "../bot.ts";
 import { buildUserData } from "./buildUserData.ts";
+import { fetchUserPresences } from "./fetchUserPresences.ts";
 import { findMemberProfile, memberProfiles } from "./memberProfiles.ts";
 import "./patchBigInt.ts";
 
@@ -13,5 +14,6 @@ export async function getUserData(id: string) {
   }));
  if (!profile) return null;
  // Offline members may have no presence at all; membership was verified above.
- return buildUserData(profile, presencesCache.get(id));
+ fetchUserPresences(id);
+ return buildUserData(profile, await presenceWait.wait(id));
 }

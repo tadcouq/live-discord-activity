@@ -4,8 +4,10 @@ import { DiscordPresenceUpdate, Intents } from "npm:@discordeno/types@20.0.0";
 import { addDesiredProperties } from "./lib/addDesiredProperties.ts";
 
 import { memberProfiles } from "./lib/memberProfiles.ts";
+import { createPresenceWait } from "./lib/presenceWait.ts";
 
 export const presencesCache = new Map<string, DiscordPresenceUpdate>();
+export const presenceWait = createPresenceWait(presencesCache);
 
 export const bot = createBot({
  token: Deno.env.get("TOKEN") || "",
@@ -37,13 +39,13 @@ export const bot = createBot({
     if (guildChunk.guild_id.toString() !== Deno.env.get("GUILD_ID")) return;
     if (!guildChunk.presences) return;
     guildChunk.presences.forEach((presence: DiscordPresenceUpdate) => {
-     presencesCache.set(presence.user.id.toString(), presence);
+     presenceWait.update(presence.user.id.toString(), presence);
     });
    }
    if (data.t === "PRESENCE_UPDATE") {
     const presence = data.d as DiscordPresenceUpdate;
     if (presence.guild_id.toString() !== Deno.env.get("GUILD_ID")) return;
-    presencesCache.set(presence.user.id.toString(), presence);
+    presenceWait.update(presence.user.id.toString(), presence);
    }
    if (data.t === "GUILD_MEMBER_REMOVE" || data.t === "GUILD_MEMBER_UPDATE" || data.t === "GUILD_MEMBER_ADD") {
     const member = data.d as { guild_id: string; user: { id: string } };

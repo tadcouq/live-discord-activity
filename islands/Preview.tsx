@@ -125,10 +125,10 @@ export default function Preview({ defaultUrl }: { defaultUrl: string }) {
      <p className="mb-3 text-sm text-neutral-400">{format === "markdown" ? "Paste into your GitHub README." : format === "html" ? "An HTML image embed that loads your SVG card." : "Direct URL to your SVG card."}</p>
      <textarea aria-label="Generated embed code" readOnly value={output} placeholder="Enter a valid Discord ID to generate your code." rows={5} className="w-full resize-y rounded-lg border border-neutral-800 bg-neutral-900 p-3 font-mono text-sm text-white" />
      <div className="mt-3 flex flex-wrap items-center gap-3">
-      <Button disabled={!valid} onClick={copy}>Copy {format === "url" ? "URL" : format === "html" ? "HTML" : "Markdown"}</Button>
+      <Button className="min-w-36" disabled={!valid} onClick={copy}>Copy {format === "url" ? "URL" : format === "html" ? "HTML" : "Markdown"}</Button>
       {valid && <a href={cardUrl} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "secondary" })}>Open SVG</a>}
      </div>
-     <p role="status" className="mt-2 text-sm text-neutral-400">{copyStatus}</p>
+     <p role="status" className={`mt-2 text-sm ${copyStatus === "Copied!" ? "text-green-400" : copyStatus ? "text-red-400" : "text-neutral-400"}`}>{copyStatus}</p>
      <h3 className="mb-3 mt-6 font-medium text-neutral-300">Preview</h3>
      {valid && previewUrl === cardUrl ? <CardPreview key={previewUrl} url={previewUrl} /> : <p className="text-sm text-neutral-400">{valid ? "Updating preview..." : "Enter your Discord ID and valid options to preview the card."}</p>}
      {validId && <a href={rawUrl} target="_blank" rel="noopener noreferrer" className="mt-6 inline-block text-sm text-blue-400 underline">Open raw JSON API</a>}
