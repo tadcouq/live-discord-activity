@@ -25,7 +25,7 @@ export default define.page((props: PageProps) => {
      </div>
      {!shareBot && (
       <p className="mt-4 text-sm text-neutral-400">
-       Interested in using this project? <a href="https://github.com/igorkowalczyk/discord-activity#-self-hosting" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">Host your own instance</a> with your own Discord bot and server.
+        Interested in using this project? <a href="https://github.com/tadcouq/live-discord-activity#-self-hosting" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">Host your own instance</a> with your own Discord bot and server.
       </p>
      )}
     </div>
