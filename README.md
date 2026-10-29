@@ -135,6 +135,7 @@ hideStatus: true
 | `TOKEN`       | Discord Bot Token from the [Discord Developer Portal](https://discord.com/developers/applications). |         | ✅       |
 | `GUILD_ID`    | Discord Guild ID where the bot will watch the users.                                                |         | ✅       |
 | `INVITE_LINK` | Discord server invite link where the bot is located.                                                |         | ✅       |
+| `SHARE_BOT`   | Set to `true` to show the Join Discord button using `INVITE_LINK`; otherwise recommend self-hosting. | `false` | ❌       |
 | `PORT`        | Port on which the application will be running.                                                      | `3000`  | ❌       |
 
 > [!NOTE]

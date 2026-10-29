@@ -129,6 +129,7 @@ export default function Preview({ defaultUrl }: { defaultUrl: string }) {
       {valid && <a href={cardUrl} target="_blank" rel="noopener noreferrer" className={buttonVariants({ variant: "secondary" })}>Open SVG</a>}
      </div>
      <p role="status" className={`mt-2 text-sm ${copyStatus === "Copied!" ? "text-green-400" : copyStatus ? "text-red-400" : "text-neutral-400"}`}>{copyStatus}</p>
+     {!valid && <p className="text-sm text-neutral-300">Enter a valid Discord ID to enable copying.</p>}
      <h3 className="mb-3 mt-6 font-medium text-neutral-300">Preview</h3>
      {valid && previewUrl === cardUrl ? <CardPreview key={previewUrl} url={previewUrl} /> : <p className="text-sm text-neutral-400">{valid ? "Updating preview..." : "Enter your Discord ID and valid options to preview the card."}</p>}
      {validId && <a href={rawUrl} target="_blank" rel="noopener noreferrer" className="mt-6 inline-block text-sm text-blue-400 underline">Open raw JSON API</a>}

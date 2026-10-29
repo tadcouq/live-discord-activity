@@ -5,20 +5,29 @@ import { define } from "../utils.ts";
 import { PageProps } from "fresh";
 
 export default define.page((props: PageProps) => {
+ const inviteLink = Deno.env.get("INVITE_LINK");
+ const shareBot = Deno.env.get("SHARE_BOT") === "true" && !!inviteLink;
  return (
   <>
    <section className="relative grid w-full grid-cols-1 gap-x-4 overflow-hidden border-x border-b border-neutral-800 p-6 lg:grid-cols-2 lg:p-12">
     <div className="flex flex-col items-start justify-center lg:col-span-1">
      <Header id="main">Discord Activity</Header>
      <p className="mt-2 text-lg text-neutral-400">API for displaying Discord activity data in JSON or SVG</p>
-     <div className="mt-4 flex items-center justify-center gap-4">
+     <div className="mt-4 flex flex-wrap items-center gap-4">
       <a href="/docs" className={buttonVariants({ variant: "primary" })}>
        Documentation
       </a>
-      <a href="/discord" className={buttonVariants({ variant: "secondary" })} target="_blank">
-       Join Discord
-      </a>
+      {shareBot && (
+       <a href={inviteLink} className={buttonVariants({ variant: "secondary" })} target="_blank" rel="noopener noreferrer">
+        Join Discord
+       </a>
+      )}
      </div>
+     {!shareBot && (
+      <p className="mt-4 text-sm text-neutral-400">
+       Interested in using this project? <a href="https://github.com/igorkowalczyk/discord-activity#-self-hosting" target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">Host your own instance</a> with your own Discord bot and server.
+      </p>
+     )}
     </div>
     <div className="lg:flex lg:items-center lg:justify-end lg:col-span-1 hidden">
      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="aspect-square rounded-full size-52 stroke-white ">
